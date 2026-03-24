@@ -5,6 +5,7 @@ import {
   ShieldCheck, 
   CheckCircle, 
   AlertTriangle, 
+  UserPlus, // <-- Icono que faltaba importar
   LogOut 
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
@@ -22,10 +23,13 @@ const firebaseConfig = {
   measurementId: "G-6SZ8M3BG0N"
 };
 
-// 2. Inicialización directa y a prueba de fallos
+// 2. Inicialización directa
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// URL del logo institucional
+const LOGO_URL = "https://www.cordonbleu.edu/workspace/assets/img/logo.png";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -43,7 +47,7 @@ export default function App() {
   const [studentError, setStudentError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [alreadyRegistered, setAlreadyRegistered] = useState(false); // Candado de dispositivo
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false); 
   
   const [formData, setFormData] = useState({
     matricula: '',
@@ -68,7 +72,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Lector de QR (Parámetros URL) y Candado de Dispositivo
+  // 2. Lector de QR y Candado de Dispositivo
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
@@ -78,7 +82,6 @@ export default function App() {
       setScannedToken(tokenFromUrl);
       setEventId(eventFromUrl);
       
-      // Verificamos si este dispositivo ya tiene un registro para este evento (1ra capa de seguridad)
       if (localStorage.getItem(`registrado_${eventFromUrl}`)) {
         setAlreadyRegistered(true);
       }
@@ -111,7 +114,7 @@ export default function App() {
     return () => clearInterval(interval);
   }, [user, view, eventId]);
 
-  // 4. Escucha de Asistentes (Tiempo Real)
+  // 4. Escucha de Asistentes
   useEffect(() => {
     if (!user || view !== 'teacher' || !eventId) return;
     
@@ -154,10 +157,9 @@ export default function App() {
     e.preventDefault();
     if (!isValidated) return;
     setIsSubmitting(true);
-    setStudentError(null); // Limpiar errores previos
+    setStudentError(null);
 
     try {
-      // 1. Limpiamos la matrícula (quitamos espacios extra o caracteres raros para evitar engaños)
       const safeMatricula = formData.matricula.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
       if (!safeMatricula) {
         setStudentError("Ingresa una matrícula válida.");
@@ -165,21 +167,16 @@ export default function App() {
         return;
       }
 
-      // 2. Creamos un ID único combinando la clase y la matrícula (Ej: Hoteleria101_00501718)
       const docId = `${eventId}_${safeMatricula}`;
       const asistenteRef = doc(db, 'asistentes', docId);
-
-      // 3. VAMOS A FIREBASE: Verificamos si ese ID ya existe (2da capa de seguridad INFALIBLE)
       const docSnap = await getDoc(asistenteRef);
       
       if (docSnap.exists()) {
-        // Si ya existe, ¡bloqueamos el registro!
-        setStudentError("Esta matrícula ya ha sido registrada en esta clase de forma previa.");
+        setStudentError("Esta matrícula ya ha sido registrada en esta clase.");
         setIsSubmitting(false);
         return;
       }
 
-      // 4. Si no existe, guardamos el documento con ese ID único
       await setDoc(asistenteRef, {
         matricula: formData.matricula.trim(),
         nombre: formData.nombre.trim(),
@@ -189,13 +186,11 @@ export default function App() {
         uid: user.uid 
       });
       
-      // Bloqueamos el dispositivo localmente por si acaso (1ra capa)
       localStorage.setItem(`registrado_${eventId}`, 'true');
       setSuccess(true);
       
     } catch (e) { 
-      setStudentError("Error al guardar el registro. Verifica tu conexión."); 
-      console.error(e);
+      setStudentError("Error al guardar el registro."); 
     }
     setIsSubmitting(false);
   };
@@ -213,12 +208,13 @@ export default function App() {
       <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100">
         <div className="bg-[#002A54] p-10 text-center text-white">
           <img 
-            src="https://www.cordonbleu.edu/workspace/assets/img/logo.png" 
-            alt="Le Cordon Bleu Logo" 
+            src={LOGO_URL}
+            alt="Le Cordon Bleu" 
             className="h-20 mx-auto mb-6 object-contain brightness-0 invert" 
+            onError={(e) => { e.target.style.display = 'none'; }}
           />
           <h1 className="text-3xl font-extrabold tracking-tight">Registro Seguro</h1>
-          <p className="opacity-80 font-medium mt-1">Panel de Asistencia</p>
+          <p className="opacity-80 font-medium mt-1 uppercase text-xs tracking-[0.2em]">Panel de Asistencia</p>
         </div>
         <div className="p-10 space-y-6">
           <div className="space-y-2">
@@ -250,11 +246,12 @@ export default function App() {
       <div className="min-h-screen bg-slate-100 p-4 md:p-8 text-slate-800">
         <header className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm mb-8 border border-slate-200">
           <div className="flex items-center gap-4 text-slate-800">
-            <div className="bg-[#002A54] p-3 rounded-xl text-white">
+            <div className="bg-[#002A54] p-2 rounded-xl text-white flex items-center justify-center">
               <img 
-                src="https://www.cordonbleu.edu/workspace/assets/img/logo.png" 
+                src={LOGO_URL}
                 alt="Logo" 
-                className="w-8 h-8 object-contain brightness-0 invert" 
+                className="w-10 h-10 object-contain brightness-0 invert" 
+                onError={(e) => { e.target.style.display = 'none'; }}
               />
             </div>
             <div>
@@ -287,7 +284,7 @@ export default function App() {
               <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                 <div className="h-full bg-[#002A54] transition-all duration-1000 ease-linear" style={{width: `${(countdown/10)*100}%`}}></div>
               </div>
-              <p className="mt-6 text-xs text-slate-400 font-medium">Este código cambia cada 10 segundos para evitar que sea compartido fuera del aula.</p>
+              <p className="mt-6 text-[10px] text-slate-400 font-medium leading-relaxed">Este código dinámico evita que la asistencia sea compartida fuera del aula.</p>
             </div>
           </div>
 
@@ -333,20 +330,20 @@ export default function App() {
       <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-white/20">
         <div className="bg-[#001f3f] p-10 text-center text-white relative">
           <img 
-            src="https://www.cordonbleu.edu/workspace/assets/img/logo.png" 
-            alt="Le Cordon Bleu Logo" 
-            className="h-16 mx-auto mb-4 object-contain brightness-0 invert opacity-90" 
+            src={LOGO_URL}
+            alt="Le Cordon Bleu" 
+            className="h-20 mx-auto mb-4 object-contain brightness-0 invert opacity-90" 
+            onError={(e) => { e.target.style.display = 'none'; }}
           />
           <h1 className="text-3xl font-black tracking-tight">Pase de Lista</h1>
-          <p className="opacity-80 mt-2 text-sm font-medium">Clase: {eventId}</p>
+          <p className="opacity-80 mt-2 text-xs font-medium uppercase tracking-widest">Clase: {eventId}</p>
         </div>
         <div className="p-10 text-slate-800">
           {alreadyRegistered ? (
             <div className="text-center py-12 animate-in zoom-in duration-500">
               <ShieldCheck className="text-[#002A54] w-24 h-24 mx-auto mb-6" />
-              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Dispositivo Registrado</h2>
+              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Ya registrado</h2>
               <p className="text-slate-500 font-bold mt-4 text-sm">Ya se ha registrado una asistencia desde este dispositivo para esta clase.</p>
-              <p className="text-slate-400 text-xs mt-2">Cada alumno debe usar su propio equipo.</p>
             </div>
           ) : studentError && !isValidated ? (
             <div className="text-center p-6 bg-red-50 rounded-3xl border border-red-100">
@@ -354,7 +351,7 @@ export default function App() {
               <p className="text-red-600 font-bold">{studentError}</p>
               <button 
                 onClick={() => window.location.reload()} 
-                className="mt-6 text-sm font-bold text-slate-500 hover:text-slate-800 underline"
+                className="mt-6 text-xs font-black text-slate-400 uppercase tracking-widest hover:text-slate-600 transition-colors"
               >
                 Volver a intentar
               </button>
@@ -364,33 +361,25 @@ export default function App() {
               <CheckCircle className="text-emerald-500 w-32 h-32 mx-auto mb-8 animate-bounce" />
               <h2 className="text-4xl font-black text-slate-800 uppercase tracking-tighter">¡Listo!</h2>
               <p className="text-slate-500 font-bold mt-2">Registro completado con éxito.</p>
-              <div className="mt-8 p-4 bg-slate-50 rounded-2xl border border-slate-100 inline-block text-left w-full">
-                <p className="text-xs text-slate-400 font-bold uppercase">Matrícula</p>
-                <p className="font-mono font-bold text-slate-800">{formData.matricula}</p>
-                <p className="text-xs text-slate-400 font-bold uppercase mt-2">Hora de registro</p>
-                <p className="font-mono font-bold text-slate-800">{new Date().toLocaleTimeString()}</p>
-              </div>
             </div>
           ) : isValidated ? (
             <form onSubmit={handleStudentSubmit} className="space-y-6">
               {studentError && (
-                <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-start gap-3 text-red-600 text-sm font-bold mb-4">
-                  <AlertTriangle className="shrink-0" size={20} />
+                <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-start gap-3 text-red-600 text-xs font-bold mb-4">
+                  <AlertTriangle className="shrink-0" size={16} />
                   <p>{studentError}</p>
                 </div>
               )}
               <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center gap-3 text-emerald-700 text-[10px] font-black uppercase tracking-widest">
-                <ShieldCheck size={20} /> Presencia física validada
+                <ShieldCheck size={20} /> Presencia validada
               </div>
-              <input required placeholder="Escribe tu matrícula" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-[#002A54] transition-all" value={formData.matricula} onChange={e => setFormData({...formData, matricula: e.target.value})} />
-              <input required placeholder="Escribe tu nombre completo" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-[#002A54] transition-all" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
+              <input required placeholder="Matrícula" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-[#002A54] transition-all" value={formData.matricula} onChange={e => setFormData({...formData, matricula: e.target.value})} />
+              <input required placeholder="Nombre completo" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-[#002A54] transition-all" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
               <select required className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-[#002A54] transition-all appearance-none cursor-pointer" value={formData.licenciatura} onChange={e => setFormData({...formData, licenciatura: e.target.value})}>
-                <option value="" disabled>Selecciona tu licenciatura...</option>
+                <option value="" disabled>Licenciatura...</option>
                 <option value="Dirección de Restaurantes">Dirección de Restaurantes</option>
                 <option value="Dirección Internacional de Hoteles">Dirección Internacional de Hoteles</option>
                 <option value="Gastronomía">Gastronomía</option>
-                <option value="Gastronomy">Gastronomy</option>
-                <option value="International Hotel Management">International Hotel Management</option>
                 <option value="Turismo Internacional">Turismo Internacional</option>
               </select>
               <button disabled={isSubmitting} className="w-full bg-[#002A54] text-white py-6 rounded-[2rem] font-black text-2xl shadow-xl hover:bg-[#001f3f] transition-all active:scale-95 flex justify-center items-center">
@@ -400,7 +389,7 @@ export default function App() {
           ) : (
             <div className="text-center py-24 flex flex-col items-center">
               <div className="w-12 h-12 border-8 border-[#002A54] border-t-transparent rounded-full animate-spin mb-6"></div>
-              <p className="text-slate-400 font-black uppercase tracking-[0.2em] text-[10px]">Validando presencia física...</p>
+              <p className="text-slate-400 font-black uppercase tracking-[0.2em] text-[10px]">Validando presencia...</p>
             </div>
           )}
         </div>
