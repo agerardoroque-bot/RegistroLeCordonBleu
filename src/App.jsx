@@ -45,6 +45,7 @@ export default function App() {
   const [studentError, setStudentError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false); // Nuevo estado para el candado
   
   const [formData, setFormData] = useState({
     matricula: '',
@@ -69,7 +70,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Lector de QR (Parámetros URL)
+  // 2. Lector de QR (Parámetros URL) y Candado de Dispositivo
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
@@ -78,6 +79,11 @@ export default function App() {
       setView('student');
       setScannedToken(tokenFromUrl);
       setEventId(eventFromUrl);
+      
+      // Verificamos si este dispositivo ya tiene un registro para este evento
+      if (localStorage.getItem(`registrado_${eventFromUrl}`)) {
+        setAlreadyRegistered(true);
+      }
     }
   }, []);
 
@@ -127,7 +133,7 @@ export default function App() {
 
   // 5. Verificador de Token (Alumno)
   useEffect(() => {
-    if (!user || view !== 'student' || isValidated || !scannedToken || !eventId) return;
+    if (!user || view !== 'student' || isValidated || !scannedToken || !eventId || alreadyRegistered) return;
     
     const checkToken = async () => {
       const eventDocRef = doc(db, 'eventos_activos', eventId);
@@ -144,7 +150,7 @@ export default function App() {
       }
     };
     checkToken();
-  }, [user, view, scannedToken, isValidated, eventId]);
+  }, [user, view, scannedToken, isValidated, eventId, alreadyRegistered]);
 
   const handleStudentSubmit = async (e) => {
     e.preventDefault();
@@ -154,8 +160,11 @@ export default function App() {
       await addDoc(collection(db, 'asistentes'), {
         ...formData,
         eventId,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        uid: user.uid // Guardamos también el ID anónimo por seguridad extra en BD
       });
+      // Bloqueamos el dispositivo para futuros registros en este evento
+      localStorage.setItem(`registrado_${eventId}`, 'true');
       setSuccess(true);
     } catch (e) { 
       setStudentError("Error al guardar el registro."); 
@@ -291,7 +300,14 @@ export default function App() {
           <p className="opacity-80 mt-2 text-sm font-medium">Clase: {eventId}</p>
         </div>
         <div className="p-10 text-slate-800">
-          {studentError && !isValidated ? (
+          {alreadyRegistered ? (
+            <div className="text-center py-12 animate-in zoom-in duration-500">
+              <ShieldCheck className="text-indigo-500 w-24 h-24 mx-auto mb-6" />
+              <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Dispositivo Registrado</h2>
+              <p className="text-slate-500 font-bold mt-4 text-sm">Ya se ha registrado una asistencia desde este dispositivo para esta clase.</p>
+              <p className="text-slate-400 text-xs mt-2">Cada alumno debe usar su propio equipo.</p>
+            </div>
+          ) : studentError && !isValidated ? (
             <div className="text-center p-6 bg-red-50 rounded-3xl border border-red-100">
               <AlertTriangle className="text-red-500 w-16 h-16 mx-auto mb-4" />
               <p className="text-red-600 font-bold">{studentError}</p>
