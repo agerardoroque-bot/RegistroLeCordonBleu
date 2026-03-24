@@ -1,3 +1,19 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  QrCode, 
+  Users, 
+  ShieldCheck, 
+  CheckCircle, 
+  AlertTriangle, 
+  UserPlus, 
+  LogOut 
+} from 'lucide-react';
+// 1. Importación simplificada (quitamos getApps y getApp que causaban el error)
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc } from 'firebase/firestore';
+
+// 2. TU CONFIGURACIÓN REAL DE FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyARvnoUlbzzN0xhrBBrDZQECga3kMWiTN8",
   authDomain: "gerardo-roque.firebaseapp.com",
@@ -8,12 +24,8 @@ const firebaseConfig = {
   measurementId: "G-6SZ8M3BG0N"
 };
 
-let app;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-} else {
-  app = getApp();
-}
+// 3. Inicialización directa y a prueba de fallos
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
