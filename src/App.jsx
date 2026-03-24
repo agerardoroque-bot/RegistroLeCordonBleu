@@ -5,15 +5,13 @@ import {
   ShieldCheck, 
   CheckCircle, 
   AlertTriangle, 
-  UserPlus, 
   LogOut 
 } from 'lucide-react';
-// 1. Importación simplificada (quitamos getApps y getApp que causaban el error)
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot, addDoc } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 
-// 2. TU CONFIGURACIÓN REAL DE FIREBASE
+// 1. TU CONFIGURACIÓN REAL DE FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyARvnoUlbzzN0xhrBBrDZQECga3kMWiTN8",
   authDomain: "gerardo-roque.firebaseapp.com",
@@ -24,7 +22,7 @@ const firebaseConfig = {
   measurementId: "G-6SZ8M3BG0N"
 };
 
-// 3. Inicialización directa y a prueba de fallos
+// 2. Inicialización directa y a prueba de fallos
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -45,7 +43,7 @@ export default function App() {
   const [studentError, setStudentError] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [alreadyRegistered, setAlreadyRegistered] = useState(false); // Nuevo estado para el candado
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false); // Candado de dispositivo
   
   const [formData, setFormData] = useState({
     matricula: '',
@@ -80,7 +78,7 @@ export default function App() {
       setScannedToken(tokenFromUrl);
       setEventId(eventFromUrl);
       
-      // Verificamos si este dispositivo ya tiene un registro para este evento
+      // Verificamos si este dispositivo ya tiene un registro para este evento (1ra capa de seguridad)
       if (localStorage.getItem(`registrado_${eventFromUrl}`)) {
         setAlreadyRegistered(true);
       }
@@ -156,18 +154,47 @@ export default function App() {
     e.preventDefault();
     if (!isValidated) return;
     setIsSubmitting(true);
+    setStudentError(null); // Limpiar errores previos
+
     try {
-      await addDoc(collection(db, 'asistentes'), {
-        ...formData,
+      // 1. Limpiamos la matrícula (quitamos espacios extra o caracteres raros para evitar engaños)
+      const safeMatricula = formData.matricula.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!safeMatricula) {
+        setStudentError("Ingresa una matrícula válida.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Creamos un ID único combinando la clase y la matrícula (Ej: Hoteleria101_00501718)
+      const docId = `${eventId}_${safeMatricula}`;
+      const asistenteRef = doc(db, 'asistentes', docId);
+
+      // 3. VAMOS A FIREBASE: Verificamos si ese ID ya existe (2da capa de seguridad INFALIBLE)
+      const docSnap = await getDoc(asistenteRef);
+      
+      if (docSnap.exists()) {
+        // Si ya existe, ¡bloqueamos el registro!
+        setStudentError("Esta matrícula ya ha sido registrada en esta clase de forma previa.");
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 4. Si no existe, guardamos el documento con ese ID único
+      await setDoc(asistenteRef, {
+        matricula: formData.matricula.trim(),
+        nombre: formData.nombre.trim(),
+        licenciatura: formData.licenciatura,
         eventId,
         timestamp: new Date().toISOString(),
-        uid: user.uid // Guardamos también el ID anónimo por seguridad extra en BD
+        uid: user.uid 
       });
-      // Bloqueamos el dispositivo para futuros registros en este evento
+      
+      // Bloqueamos el dispositivo localmente por si acaso (1ra capa)
       localStorage.setItem(`registrado_${eventId}`, 'true');
       setSuccess(true);
+      
     } catch (e) { 
-      setStudentError("Error al guardar el registro."); 
+      setStudentError("Error al guardar el registro. Verifica tu conexión."); 
       console.error(e);
     }
     setIsSubmitting(false);
@@ -175,7 +202,7 @@ export default function App() {
 
   if (!user) return (
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50">
-      <div className="w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <div className="w-10 h-10 border-4 border-[#002A54] border-t-transparent rounded-full animate-spin mb-4"></div>
       <p className="text-slate-500 font-bold uppercase tracking-widest text-xs text-center">Iniciando sistema...</p>
     </div>
   );
@@ -184,23 +211,27 @@ export default function App() {
   if (view === 'home') return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-900">
       <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100">
-        <div className="bg-indigo-600 p-10 text-center text-white">
-          <ShieldCheck className="w-20 h-20 mx-auto mb-4 drop-shadow-lg" />
+        <div className="bg-[#002A54] p-10 text-center text-white">
+          <img 
+            src="https://www.cordonbleu.edu/workspace/assets/img/logo.png" 
+            alt="Le Cordon Bleu Logo" 
+            className="h-20 mx-auto mb-6 object-contain brightness-0 invert" 
+          />
           <h1 className="text-3xl font-extrabold tracking-tight">Registro Seguro</h1>
-          <p className="opacity-80 font-medium">Panel de Asistencia</p>
+          <p className="opacity-80 font-medium mt-1">Panel de Asistencia</p>
         </div>
         <div className="p-10 space-y-6">
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">ID de la Clase o Evento</label>
             <input 
               type="text" placeholder="Ej. Hoteleria101" 
-              className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all font-bold text-slate-800"
+              className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:ring-4 focus:ring-[#002A54]/10 focus:border-[#002A54] outline-none transition-all font-bold text-slate-800"
               value={eventId} onChange={(e) => setEventId(e.target.value.trim())}
             />
           </div>
           <button 
             disabled={!eventId} onClick={() => setView('teacher')}
-            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-black shadow-xl transition-all disabled:opacity-40 active:scale-95 flex justify-center items-center gap-2"
+            className="w-full bg-[#002A54] hover:bg-[#001f3f] text-white py-4 rounded-2xl font-black shadow-xl transition-all disabled:opacity-40 active:scale-95 flex justify-center items-center gap-2"
           >
             <QrCode size={20} /> GENERAR QR DOCENTE
           </button>
@@ -219,7 +250,13 @@ export default function App() {
       <div className="min-h-screen bg-slate-100 p-4 md:p-8 text-slate-800">
         <header className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm mb-8 border border-slate-200">
           <div className="flex items-center gap-4 text-slate-800">
-            <div className="bg-indigo-600 p-3 rounded-xl text-white"><ShieldCheck size={24} /></div>
+            <div className="bg-[#002A54] p-3 rounded-xl text-white">
+              <img 
+                src="https://www.cordonbleu.edu/workspace/assets/img/logo.png" 
+                alt="Logo" 
+                className="w-8 h-8 object-contain brightness-0 invert" 
+              />
+            </div>
             <div>
               <h2 className="font-black text-lg">Sala: {eventId}</h2>
               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Monitoreo en vivo</p>
@@ -236,7 +273,7 @@ export default function App() {
             <div className="bg-slate-50 p-6 rounded-3xl border-2 border-slate-100 mb-6 relative">
               {countdown <= 1 && (
                 <div className="absolute inset-0 bg-white/80 rounded-3xl flex items-center justify-center z-10 backdrop-blur-sm">
-                  <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="w-8 h-8 border-4 border-[#002A54] border-t-transparent rounded-full animate-spin"></div>
                 </div>
               )}
               <img src={qrImageSrc} alt="QR" className="w-64 h-64 object-contain mix-blend-multiply" />
@@ -245,10 +282,10 @@ export default function App() {
             <div className="w-full text-slate-800">
               <div className="flex justify-between text-[10px] mb-2 font-black uppercase text-slate-400">
                 <span>Actualización en:</span>
-                <span className={countdown <= 3 ? 'text-red-500 animate-pulse' : 'text-indigo-600'}>{countdown}s</span>
+                <span className={countdown <= 3 ? 'text-red-500 animate-pulse' : 'text-[#002A54]'}>{countdown}s</span>
               </div>
               <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-500 transition-all duration-1000 ease-linear" style={{width: `${(countdown/10)*100}%`}}></div>
+                <div className="h-full bg-[#002A54] transition-all duration-1000 ease-linear" style={{width: `${(countdown/10)*100}%`}}></div>
               </div>
               <p className="mt-6 text-xs text-slate-400 font-medium">Este código cambia cada 10 segundos para evitar que sea compartido fuera del aula.</p>
             </div>
@@ -256,7 +293,7 @@ export default function App() {
 
           <div className="lg:col-span-2 bg-white rounded-[2.5rem] shadow-xl p-8 flex flex-col min-h-[500px] border border-slate-200 text-slate-800">
             <div className="flex justify-between items-center mb-8 text-slate-800">
-              <h2 className="text-xl font-black flex items-center gap-3"><Users className="text-indigo-600" /> Asistentes</h2>
+              <h2 className="text-xl font-black flex items-center gap-3"><Users className="text-[#002A54]" /> Asistentes</h2>
               <div className="bg-emerald-500 text-white px-6 py-1 rounded-full font-black text-xl shadow-lg">{attendees.length}</div>
             </div>
             <div className="flex-1 overflow-auto rounded-3xl border border-slate-100 bg-slate-50/50">
@@ -271,8 +308,8 @@ export default function App() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-800">
                   {attendees.map(a => (
-                    <tr key={a.id} className="bg-white hover:bg-indigo-50/40 transition-colors">
-                      <td className="p-6 font-mono font-bold text-indigo-600">{a.matricula}</td>
+                    <tr key={a.id} className="bg-white hover:bg-slate-50 transition-colors">
+                      <td className="p-6 font-mono font-bold text-[#002A54]">{a.matricula}</td>
                       <td className="p-6 font-black text-slate-800">{a.nombre}</td>
                       <td className="p-6"><span className="text-[9px] font-black bg-slate-100 px-3 py-1 rounded-lg text-slate-500 uppercase">{a.licenciatura}</span></td>
                       <td className="p-6 text-slate-400 font-bold tabular-nums text-right">{new Date(a.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</td>
@@ -292,17 +329,21 @@ export default function App() {
 
   // --- VISTA ALUMNO ---
   if (view === 'student') return (
-    <div className="min-h-screen bg-indigo-600 flex flex-col items-center p-6 pt-12 text-slate-900">
+    <div className="min-h-screen bg-[#002A54] flex flex-col items-center p-6 pt-12 text-slate-900">
       <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-white/20">
-        <div className="bg-indigo-700 p-10 text-center text-white relative">
-          <UserPlus className="w-16 h-16 mx-auto mb-4" />
+        <div className="bg-[#001f3f] p-10 text-center text-white relative">
+          <img 
+            src="https://www.cordonbleu.edu/workspace/assets/img/logo.png" 
+            alt="Le Cordon Bleu Logo" 
+            className="h-16 mx-auto mb-4 object-contain brightness-0 invert opacity-90" 
+          />
           <h1 className="text-3xl font-black tracking-tight">Pase de Lista</h1>
           <p className="opacity-80 mt-2 text-sm font-medium">Clase: {eventId}</p>
         </div>
         <div className="p-10 text-slate-800">
           {alreadyRegistered ? (
             <div className="text-center py-12 animate-in zoom-in duration-500">
-              <ShieldCheck className="text-indigo-500 w-24 h-24 mx-auto mb-6" />
+              <ShieldCheck className="text-[#002A54] w-24 h-24 mx-auto mb-6" />
               <h2 className="text-2xl font-black text-slate-800 uppercase tracking-tighter">Dispositivo Registrado</h2>
               <p className="text-slate-500 font-bold mt-4 text-sm">Ya se ha registrado una asistencia desde este dispositivo para esta clase.</p>
               <p className="text-slate-400 text-xs mt-2">Cada alumno debe usar su propio equipo.</p>
@@ -332,12 +373,18 @@ export default function App() {
             </div>
           ) : isValidated ? (
             <form onSubmit={handleStudentSubmit} className="space-y-6">
+              {studentError && (
+                <div className="bg-red-50 p-4 rounded-2xl border border-red-100 flex items-start gap-3 text-red-600 text-sm font-bold mb-4">
+                  <AlertTriangle className="shrink-0" size={20} />
+                  <p>{studentError}</p>
+                </div>
+              )}
               <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100 flex items-center gap-3 text-emerald-700 text-[10px] font-black uppercase tracking-widest">
                 <ShieldCheck size={20} /> Presencia física validada
               </div>
-              <input required placeholder="Escribe tu matrícula" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all" value={formData.matricula} onChange={e => setFormData({...formData, matricula: e.target.value})} />
-              <input required placeholder="Escribe tu nombre completo" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
-              <select required className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer" value={formData.licenciatura} onChange={e => setFormData({...formData, licenciatura: e.target.value})}>
+              <input required placeholder="Escribe tu matrícula" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-[#002A54] transition-all" value={formData.matricula} onChange={e => setFormData({...formData, matricula: e.target.value})} />
+              <input required placeholder="Escribe tu nombre completo" className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-[#002A54] transition-all" value={formData.nombre} onChange={e => setFormData({...formData, nombre: e.target.value})} />
+              <select required className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold text-slate-800 outline-none focus:border-[#002A54] transition-all appearance-none cursor-pointer" value={formData.licenciatura} onChange={e => setFormData({...formData, licenciatura: e.target.value})}>
                 <option value="" disabled>Selecciona tu licenciatura...</option>
                 <option value="Dirección de Restaurantes">Dirección de Restaurantes</option>
                 <option value="Dirección Internacional de Hoteles">Dirección Internacional de Hoteles</option>
@@ -346,13 +393,13 @@ export default function App() {
                 <option value="International Hotel Management">International Hotel Management</option>
                 <option value="Turismo Internacional">Turismo Internacional</option>
               </select>
-              <button disabled={isSubmitting} className="w-full bg-indigo-600 text-white py-6 rounded-[2rem] font-black text-2xl shadow-xl hover:bg-indigo-700 transition-all active:scale-95 flex justify-center items-center">
+              <button disabled={isSubmitting} className="w-full bg-[#002A54] text-white py-6 rounded-[2rem] font-black text-2xl shadow-xl hover:bg-[#001f3f] transition-all active:scale-95 flex justify-center items-center">
                 {isSubmitting ? <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin"></div> : "REGISTRARME"}
               </button>
             </form>
           ) : (
             <div className="text-center py-24 flex flex-col items-center">
-              <div className="w-12 h-12 border-8 border-indigo-600 border-t-transparent rounded-full animate-spin mb-6"></div>
+              <div className="w-12 h-12 border-8 border-[#002A54] border-t-transparent rounded-full animate-spin mb-6"></div>
               <p className="text-slate-400 font-black uppercase tracking-[0.2em] text-[10px]">Validando presencia física...</p>
             </div>
           )}
