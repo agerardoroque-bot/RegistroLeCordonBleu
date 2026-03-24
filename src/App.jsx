@@ -5,7 +5,7 @@ import {
   ShieldCheck, 
   CheckCircle, 
   AlertTriangle, 
-  UserPlus, // <-- Icono que faltaba importar
+  UserPlus, 
   LogOut 
 } from 'lucide-react';
 import { initializeApp } from 'firebase/app';
@@ -27,9 +27,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
-// URL del logo institucional
-const LOGO_URL = "https://www.cordonbleu.edu/workspace/assets/img/logo.png";
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -206,13 +203,8 @@ export default function App() {
   if (view === 'home') return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-slate-900">
       <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-slate-100">
-        <div className="bg-[#002A54] p-10 text-center text-white">
-          <img 
-            src={LOGO_URL}
-            alt="Le Cordon Bleu" 
-            className="h-20 mx-auto mb-6 object-contain brightness-0 invert" 
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
+        <div className="bg-[#002A54] p-12 text-center text-white">
+          <ShieldCheck className="w-20 h-20 mx-auto mb-4 drop-shadow-lg" />
           <h1 className="text-3xl font-extrabold tracking-tight">Registro Seguro</h1>
           <p className="opacity-80 font-medium mt-1 uppercase text-xs tracking-[0.2em]">Panel de Asistencia</p>
         </div>
@@ -246,13 +238,8 @@ export default function App() {
       <div className="min-h-screen bg-slate-100 p-4 md:p-8 text-slate-800">
         <header className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm mb-8 border border-slate-200">
           <div className="flex items-center gap-4 text-slate-800">
-            <div className="bg-[#002A54] p-2 rounded-xl text-white flex items-center justify-center">
-              <img 
-                src={LOGO_URL}
-                alt="Logo" 
-                className="w-10 h-10 object-contain brightness-0 invert" 
-                onError={(e) => { e.target.style.display = 'none'; }}
-              />
+            <div className="bg-[#002A54] p-3 rounded-xl text-white">
+              <ShieldCheck size={24} />
             </div>
             <div>
               <h2 className="font-black text-lg">Sala: {eventId}</h2>
@@ -328,13 +315,8 @@ export default function App() {
   if (view === 'student') return (
     <div className="min-h-screen bg-[#002A54] flex flex-col items-center p-6 pt-12 text-slate-900">
       <div className="w-full max-w-md bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-white/20">
-        <div className="bg-[#001f3f] p-10 text-center text-white relative">
-          <img 
-            src={LOGO_URL}
-            alt="Le Cordon Bleu" 
-            className="h-20 mx-auto mb-4 object-contain brightness-0 invert opacity-90" 
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
+        <div className="bg-[#001f3f] p-12 text-center text-white relative">
+          <UserPlus className="w-16 h-16 mx-auto mb-4 opacity-90" />
           <h1 className="text-3xl font-black tracking-tight">Pase de Lista</h1>
           <p className="opacity-80 mt-2 text-xs font-medium uppercase tracking-widest">Clase: {eventId}</p>
         </div>
